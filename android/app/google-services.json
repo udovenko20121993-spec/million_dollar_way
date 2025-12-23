@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "849941004294",
+    "project_id": "milliondollarway-fbdaf",
+    "storage_bucket": "milliondollarway-fbdaf.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:849941004294:android:7e76f4097af0e548f6c387",
+        "android_client_info": {
+          "package_name": "com.example.million_dollar_way"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDoWiNb48C2FuXkXbSIrJHuy6x7y5KadOg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
