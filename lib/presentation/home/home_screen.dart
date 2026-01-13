@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:million_dollar_way/models/ibkr_data.dart';
 import 'package:million_dollar_way/presentation/dashboard/widgets/capital_chart.dart';
+import 'package:million_dollar_way/presentation/benchmark/benchmark_comparison_card.dart';
 
 class HomeScreen extends StatelessWidget {
   final String userId = "user_test_1";
@@ -148,7 +149,23 @@ class HomeScreen extends StatelessWidget {
                 const SizedBox(height: 10),
                 CapitalChart(trades: report.trades),
 
-                // --- СПИСОК АКТИВІВ ВИДАЛЕНО ---
+                const SizedBox(height: 24),
+
+                // 4. ПОРІВНЯННЯ З S&P 500
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Text(
+                    "vs S&P 500",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                BenchmarkComparisonCard(userId: userId),
+
                 const SizedBox(height: 50),
               ],
             ),
