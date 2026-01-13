@@ -4,7 +4,9 @@ import 'dart:math' as math;
 import 'midas_data.dart';
 import 'stock_detail_screen.dart';
 import '../../models/midas_settings.dart';
+import '../../models/stock_data.dart';
 import '../../services/midas_service.dart';
+import '../../services/stock_price_service.dart';
 
 class MidasScreen extends StatefulWidget {
   const MidasScreen({super.key});
@@ -17,6 +19,7 @@ class _MidasScreenState extends State<MidasScreen> with SingleTickerProviderStat
   // --- СТАН ---
   final String userId = "user_test_1";
   late MidasService _midasService;
+  final StockPriceService _priceService = StockPriceService();
   
   bool _isAnalyticsMode = false;
   bool _useBotStrategy = true;
@@ -29,7 +32,16 @@ class _MidasScreenState extends State<MidasScreen> with SingleTickerProviderStat
   SortType _currentSort = SortType.profitDesc;
 
   late List<Map<String, dynamic>> _analyticsPortfolio;
-  final int _stockCount = tickersList.length;
+  int _stockCount = tickersList.length;
+  
+  // Ціни акцій
+  Map<String, StockInfo> _stockPrices = {};
+  DateTime? _pricesLastUpdated;
+  bool _isLoadingPrices = false;
+  
+  // Реальний портфель користувача (для симулятора)
+  UserPortfolio? _userPortfolio;
+  bool _isLoadingPortfolio = false;
   
   // Milestones
   List<MidasMilestone> _milestones = getDefaultMilestones();
@@ -57,8 +69,58 @@ class _MidasScreenState extends State<MidasScreen> with SingleTickerProviderStat
       CurvedAnimation(parent: _progressAnimationController, curve: Curves.easeOutCubic),
     );
     
+    _loadPrices();
     _loadSettings();
-    _regenerateAnalyticsData();
+  }
+
+  Future<void> _loadPrices() async {
+    setState(() => _isLoadingPrices = true);
+    
+    try {
+      final prices = await _priceService.getAllPrices();
+      final lastUpdated = await _priceService.getLastUpdateTime();
+      
+      setState(() {
+        _stockPrices = prices;
+        _stockCount = prices.length;
+        _pricesLastUpdated = lastUpdated;
+        _isLoadingPrices = false;
+      });
+      
+      _regenerateAnalyticsData();
+    } catch (e) {
+      print('Error loading prices: $e');
+      setState(() => _isLoadingPrices = false);
+    }
+  }
+
+  Future<void> _refreshPrices() async {
+    setState(() => _isLoadingPrices = true);
+    
+    final success = await _priceService.refreshPricesFromAPI();
+    
+    if (success) {
+      await _loadPrices();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Ціни оновлено!'),
+            backgroundColor: Color(0xFF00C853),
+            duration: Duration(seconds: 1),
+          ),
+        );
+      }
+    } else {
+      setState(() => _isLoadingPrices = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('⚠️ Не вдалося оновити ціни'),
+            backgroundColor: Colors.orangeAccent,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _loadSettings() async {
@@ -77,7 +139,23 @@ class _MidasScreenState extends State<MidasScreen> with SingleTickerProviderStat
     });
     _regenerateAnalyticsData();
     _progressAnimationController.forward();
+    _loadUserPortfolio();
     _loadIBKRComparison();
+  }
+
+  Future<void> _loadUserPortfolio() async {
+    setState(() => _isLoadingPortfolio = true);
+    
+    try {
+      final portfolio = await _midasService.getUserPortfolio();
+      setState(() {
+        _userPortfolio = portfolio;
+        _isLoadingPortfolio = false;
+      });
+    } catch (e) {
+      print('Error loading portfolio: $e');
+      setState(() => _isLoadingPortfolio = false);
+    }
   }
 
   Future<void> _saveSettings() async {
@@ -110,16 +188,28 @@ class _MidasScreenState extends State<MidasScreen> with SingleTickerProviderStat
   // --- ЛОГІКА РОЗРАХУНКУ ---
   void _regenerateAnalyticsData() {
     int totalMonths = _years * 12;
+    
+    // Використовуємо завантажені ціни або fallback на базові
+    final tickers = _stockPrices.isNotEmpty 
+        ? _stockPrices.keys.toList() 
+        : tickersList;
 
-    _analyticsPortfolio = tickersList.map((ticker) {
-      final profile = getStockProfile(ticker);
-      double currentPrice = profile['price']!;
-      double annualGrowth = profile['growth']!;
+    _analyticsPortfolio = tickers.map((ticker) {
+      // Отримуємо реальні дані акції
+      final stockInfo = _stockPrices[ticker] ?? getStockInfo(ticker);
+      
+      double currentPrice = stockInfo?.price ?? 50.0;
+      double annualGrowth = stockInfo?.historicalGrowth ?? 0.10;
+      double dividend = stockInfo?.dividendYield ?? 0.0;
 
-      double botBonus = _useBotStrategy ? 0.08 : 0.0;
-      double totalEffectiveGrowth = annualGrowth + botBonus;
+      // Бонус від бота (краща точка входу + реінвестиція дивідендів)
+      double botBonus = _useBotStrategy ? 0.05 : 0.0;
+      double dividendBonus = _useBotStrategy ? dividend : 0.0;
+      double totalEffectiveGrowth = annualGrowth + botBonus + dividendBonus;
 
-      double growthFactor = math.pow(1 + totalEffectiveGrowth, _years * 0.85).toDouble();
+      // Більш реалістичний розрахунок середньої ціни
+      // Використовуємо коефіцієнт 0.7 бо купували протягом всього періоду
+      double growthFactor = math.pow(1 + totalEffectiveGrowth, _years * 0.7).toDouble();
       double myAvgPrice = currentPrice / growthFactor;
 
       double totalInvestedInStock = (_weeklyPerStock * 52 / 12) * totalMonths;
@@ -127,10 +217,13 @@ class _MidasScreenState extends State<MidasScreen> with SingleTickerProviderStat
 
       return {
         "symbol": ticker,
-        "name": getStockName(ticker),
+        "name": stockInfo?.name ?? getStockName(ticker),
+        "sector": stockInfo?.sector ?? '',
         "qty": qty,
         "avgPrice": myAvgPrice,
         "currentPrice": currentPrice,
+        "growth": annualGrowth,
+        "dividend": dividend,
         "profitPercent": ((currentPrice - myAvgPrice) / myAvgPrice) * 100,
         "totalValue": qty * currentPrice,
       };
@@ -154,6 +247,18 @@ class _MidasScreenState extends State<MidasScreen> with SingleTickerProviderStat
   }
 
   SimulationResult _getSimulationResult() {
+    // Якщо є реальний портфель - використовуємо його
+    if (_userPortfolio != null && _userPortfolio!.hasPortfolio) {
+      return _midasService.calculateRealPortfolioSimulation(
+        assets: _userPortfolio!.assets,
+        currentValue: _userPortfolio!.totalValue,
+        years: _years,
+        monthlyContribution: _userPortfolio!.stockCount * _weeklyPerStock * 52 / 12,
+        useBot: _useBotStrategy,
+      );
+    }
+    
+    // Fallback на гіпотетичний розрахунок
     return _midasService.calculateSimulation(
       years: _years,
       weeklyPerStock: _weeklyPerStock,
@@ -202,17 +307,45 @@ class _MidasScreenState extends State<MidasScreen> with SingleTickerProviderStat
                   fontSize: 16,
                 ),
               ),
-              const Text(
-                "Million Dollar Way",
-                style: TextStyle(color: Colors.grey, fontSize: 10),
+              Row(
+                children: [
+                  const Text(
+                    "Million Dollar Way",
+                    style: TextStyle(color: Colors.grey, fontSize: 10),
+                  ),
+                  if (_pricesLastUpdated != null) ...[
+                    const Text(" • ", style: TextStyle(color: Colors.grey, fontSize: 10)),
+                    Text(
+                      _formatLastUpdate(_pricesLastUpdated!),
+                      style: const TextStyle(color: Colors.grey, fontSize: 10),
+                    ),
+                  ],
+                ],
               ),
             ],
           ),
           Row(
             children: [
+              // Кнопка оновлення цін
+              if (_isLoadingPrices)
+                const Padding(
+                  padding: EdgeInsets.all(8),
+                  child: SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFD4AF37)),
+                  ),
+                )
+              else
+                IconButton(
+                  icon: const Icon(Icons.refresh, color: Color(0xFFD4AF37), size: 20),
+                  tooltip: 'Оновити ціни',
+                  onPressed: _refreshPrices,
+                ),
               // Кнопка збереження
               IconButton(
                 icon: const Icon(Icons.save_outlined, color: Colors.grey, size: 20),
+                tooltip: 'Зберегти налаштування',
                 onPressed: () {
                   _saveSettings();
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -237,11 +370,20 @@ class _MidasScreenState extends State<MidasScreen> with SingleTickerProviderStat
     );
   }
 
+  String _formatLastUpdate(DateTime time) {
+    final diff = DateTime.now().difference(time);
+    if (diff.inMinutes < 60) return '${diff.inMinutes} хв тому';
+    if (diff.inHours < 24) return '${diff.inHours} год тому';
+    return '${diff.inDays} дн тому';
+  }
+
   // === СИМУЛЯТОР ===
   Widget _buildSimulatorBody() {
     final result = _getSimulationResult();
+    final hasRealPortfolio = _userPortfolio != null && _userPortfolio!.hasPortfolio;
+    
     final progress = _midasService.calculateProgress(
-      currentValue: result.estimatedValue,
+      currentValue: hasRealPortfolio ? _userPortfolio!.totalValue : result.estimatedValue,
       targetAmount: _targetAmount,
       monthlyContribution: result.monthlyContribution,
       annualRate: result.annualRate,
@@ -249,25 +391,28 @@ class _MidasScreenState extends State<MidasScreen> with SingleTickerProviderStat
 
     return Column(
       children: [
+        // === ІНФО ПРО РЕЖИМ ===
         _buildDescriptionBox(
-          "Прогноз майбутнього",
-          "Математична модель складного відсотка. Увімкніть 'Бота', щоб побачити ефект стратегії.",
+          hasRealPortfolio ? "Ваш реальний портфель" : "Гіпотетичний прогноз",
+          hasRealPortfolio 
+              ? "Прогноз на основі ваших ${_userPortfolio!.stockCount} акцій з IBKR. Поточний баланс: \$${formatMoney(_userPortfolio!.totalValue)}."
+              : "Завантажте звіт з IBKR, щоб бачити прогноз на основі реального портфеля.",
         ),
         
+        // === РЕАЛЬНИЙ ПОРТФЕЛЬ (якщо є) ===
+        if (hasRealPortfolio) _buildRealPortfolioCard(),
+        
         // === ГОЛОВНА КАРТКА ===
-        _buildMainCard(result),
+        _buildMainCard(result, hasRealPortfolio: hasRealPortfolio),
         
         // === ПРОГРЕС ДО МІЛЬЙОНА ===
-        _buildProgressCard(progress, result),
+        _buildProgressCard(progress, result, currentValue: hasRealPortfolio ? _userPortfolio!.totalValue : null),
         
         // === ГРАФІК ===
         _buildChartCard(result),
         
         // === MILESTONES ===
-        _buildMilestonesCard(result.estimatedValue),
-        
-        // === IBKR ПОРІВНЯННЯ ===
-        if (_ibkrComparison != null) _buildIBKRComparisonCard(),
+        _buildMilestonesCard(hasRealPortfolio ? _userPortfolio!.totalValue : result.estimatedValue),
         
         // === НАЛАШТУВАННЯ ===
         _buildSettingsBlock(showBotSwitch: true),
@@ -277,13 +422,109 @@ class _MidasScreenState extends State<MidasScreen> with SingleTickerProviderStat
     );
   }
 
-  Widget _buildMainCard(SimulationResult result) {
+  Widget _buildRealPortfolioCard() {
+    final portfolio = _userPortfolio!;
+    
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF00C853).withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF00C853).withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.account_balance_wallet, color: Color(0xFF00C853), size: 20),
+              const SizedBox(width: 8),
+              const Text(
+                "РЕАЛЬНИЙ ПОРТФЕЛЬ",
+                style: TextStyle(
+                  color: Color(0xFF00C853),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                  letterSpacing: 1.0,
+                ),
+              ),
+              const Spacer(),
+              if (portfolio.lastSyncTime != null)
+                Text(
+                  _formatLastUpdate(portfolio.lastSyncTime!),
+                  style: const TextStyle(color: Colors.grey, fontSize: 10),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildPortfolioStat("Баланс", "\$${formatMoney(portfolio.totalValue)}", Colors.white),
+              _buildPortfolioStat("Акцій", "${portfolio.stockCount}", Colors.blueAccent),
+              _buildPortfolioStat("Кеш", "\$${formatMoney(portfolio.cashBalance)}", Colors.orangeAccent),
+              _buildPortfolioStat("Дивід.", "\$${formatMoney(portfolio.totalDividends)}", const Color(0xFF00C853)),
+            ],
+          ),
+          if (portfolio.assets.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            const Divider(color: Colors.white10),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: portfolio.assets.take(10).map((asset) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    asset.symbol,
+                    style: const TextStyle(color: Colors.white70, fontSize: 11),
+                  ),
+                );
+              }).toList(),
+            ),
+            if (portfolio.assets.length > 10)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  "+${portfolio.assets.length - 10} інших",
+                  style: const TextStyle(color: Colors.grey, fontSize: 10),
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPortfolioStat(String label, String value, Color color) {
+    return Column(
+      children: [
+        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 10)),
+        Text(
+          value,
+          style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 14),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMainCard(SimulationResult result, {bool hasRealPortfolio = false}) {
+    final currentValue = hasRealPortfolio ? _userPortfolio!.totalValue : 0.0;
+    
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFD4AF37), Color(0xFF1A1A1A)],
+        gradient: LinearGradient(
+          colors: hasRealPortfolio 
+              ? [const Color(0xFF00C853), const Color(0xFF1A1A1A)]
+              : [const Color(0xFFD4AF37), const Color(0xFF1A1A1A)],
         ),
         borderRadius: BorderRadius.circular(20),
       ),
@@ -293,9 +534,9 @@ class _MidasScreenState extends State<MidasScreen> with SingleTickerProviderStat
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                "ВАШ ПЛАН:",
-                style: TextStyle(
+              Text(
+                hasRealPortfolio ? "ВАШ ПРОГНОЗ:" : "ГІПОТЕТИЧНИЙ ПЛАН:",
+                style: const TextStyle(
                   color: Colors.black54,
                   fontWeight: FontWeight.bold,
                   fontSize: 12,
@@ -308,7 +549,9 @@ class _MidasScreenState extends State<MidasScreen> with SingleTickerProviderStat
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  _useBotStrategy ? "🚀 ~20%/рік" : "🐌 ~10%/рік",
+                  _useBotStrategy 
+                      ? "🚀 ~${(result.annualRate * 100).toStringAsFixed(0)}%/рік" 
+                      : "📈 ~${(result.annualRate * 100).toStringAsFixed(0)}%/рік",
                   style: TextStyle(
                     color: _useBotStrategy ? const Color(0xFF00C853) : Colors.white70,
                     fontSize: 10,
@@ -323,9 +566,17 @@ class _MidasScreenState extends State<MidasScreen> with SingleTickerProviderStat
             text: TextSpan(
               style: const TextStyle(color: Colors.white, fontSize: 15, height: 1.4),
               children: [
-                const TextSpan(text: "Вкладаючи по "),
+                if (hasRealPortfolio) ...[
+                  const TextSpan(text: "Маючи "),
+                  TextSpan(
+                    text: "\$${formatMoney(currentValue)}",
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+                  ),
+                  const TextSpan(text: " і вкладаючи "),
+                ] else
+                  const TextSpan(text: "Вкладаючи по "),
                 TextSpan(
-                  text: "${result.monthlyContribution.toStringAsFixed(0)}\$ в місяць",
+                  text: "${result.monthlyContribution.toStringAsFixed(0)}\$/міс",
                   style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
                 ),
                 const TextSpan(text: " протягом "),
@@ -333,7 +584,7 @@ class _MidasScreenState extends State<MidasScreen> with SingleTickerProviderStat
                   text: "$_years р",
                   style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
                 ),
-                const TextSpan(text: ", ви отримаєте:"),
+                const TextSpan(text: ":"),
               ],
             ),
           ),
@@ -365,7 +616,10 @@ class _MidasScreenState extends State<MidasScreen> with SingleTickerProviderStat
               children: [
                 Column(
                   children: [
-                    const Text("Внески", style: TextStyle(color: Colors.white70, fontSize: 10)),
+                    Text(
+                      hasRealPortfolio ? "Старт + внески" : "Внески",
+                      style: const TextStyle(color: Colors.white70, fontSize: 10),
+                    ),
                     Text(
                       "${formatMoney(result.totalInvested)} \$",
                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
@@ -390,7 +644,12 @@ class _MidasScreenState extends State<MidasScreen> with SingleTickerProviderStat
     );
   }
 
-  Widget _buildProgressCard(ProgressToGoal progress, SimulationResult result) {
+  Widget _buildProgressCard(ProgressToGoal progress, SimulationResult result, {double? currentValue}) {
+    final displayCurrentValue = currentValue ?? result.estimatedValue;
+    final displayProgress = currentValue != null 
+        ? (currentValue / _targetAmount * 100).clamp(0.0, 100.0)
+        : progress.progressPercent;
+    
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
@@ -405,9 +664,9 @@ class _MidasScreenState extends State<MidasScreen> with SingleTickerProviderStat
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                "🎯 ПРОГРЕС ДО МІЛЬЙОНА",
-                style: TextStyle(
+              Text(
+                currentValue != null ? "🎯 ПОТОЧНИЙ ПРОГРЕС" : "🎯 ПРОГРЕС ДО МІЛЬЙОНА",
+                style: const TextStyle(
                   color: Color(0xFFD4AF37),
                   fontWeight: FontWeight.bold,
                   fontSize: 12,
@@ -415,7 +674,7 @@ class _MidasScreenState extends State<MidasScreen> with SingleTickerProviderStat
                 ),
               ),
               Text(
-                "${progress.progressPercent.toStringAsFixed(1)}%",
+                "${displayProgress.toStringAsFixed(1)}%",
                 style: const TextStyle(
                   color: Color(0xFF00C853),
                   fontWeight: FontWeight.bold,
@@ -432,11 +691,11 @@ class _MidasScreenState extends State<MidasScreen> with SingleTickerProviderStat
               return ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: LinearProgressIndicator(
-                  value: (progress.progressPercent / 100) * _progressAnimation.value,
+                  value: (displayProgress / 100) * _progressAnimation.value,
                   minHeight: 12,
                   backgroundColor: Colors.white10,
                   valueColor: AlwaysStoppedAnimation<Color>(
-                    progress.progressPercent >= 100 
+                    displayProgress >= 100 
                         ? const Color(0xFF00C853) 
                         : const Color(0xFFD4AF37),
                   ),
@@ -449,7 +708,7 @@ class _MidasScreenState extends State<MidasScreen> with SingleTickerProviderStat
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                "💰 ${formatMoney(result.estimatedValue)} \$",
+                "💰 ${formatMoney(displayCurrentValue)} \$",
                 style: const TextStyle(color: Colors.white70, fontSize: 12),
               ),
               Text(

@@ -165,11 +165,13 @@ class MidasService {
       // Отримуємо налаштування Мідаса
       final settings = await getSettings();
       
-      // Рахуємо симуляцію
+      // Рахуємо симуляцію на основі РЕАЛЬНОЇ кількості акцій користувача
+      final realStockCount = report.assets.length;
+      
       final simulation = calculateSimulation(
         years: settings.years,
         weeklyPerStock: settings.weeklyPerStock,
-        stockCount: 51, // Стандартна кількість
+        stockCount: realStockCount > 0 ? realStockCount : 1,
         useBot: settings.useBotStrategy,
       );
 
@@ -177,8 +179,9 @@ class MidasService {
         realBalance: report.lastBalance,
         simulatedBalance: simulation.estimatedValue,
         difference: report.lastBalance - simulation.estimatedValue,
-        differencePercent: ((report.lastBalance - simulation.estimatedValue) / 
-                           simulation.estimatedValue) * 100,
+        differencePercent: simulation.estimatedValue > 0 
+            ? ((report.lastBalance - simulation.estimatedValue) / simulation.estimatedValue) * 100
+            : 0,
         realAssets: report.assets,
         lastSyncTime: report.lastSyncTime,
       );
@@ -186,6 +189,110 @@ class MidasService {
       print('Error getting IBKR comparison: $e');
       return null;
     }
+  }
+
+  /// Отримати реальний портфель користувача
+  Future<UserPortfolio?> getUserPortfolio() async {
+    try {
+      final reportsSnapshot = await _db
+          .collection('users')
+          .doc(userId)
+          .collection('reports')
+          .orderBy('lastSyncTime', descending: true)
+          .limit(1)
+          .get();
+
+      if (reportsSnapshot.docs.isEmpty) return null;
+
+      final report = IBKRReport.fromFirestore(reportsSnapshot.docs.first);
+      
+      return UserPortfolio(
+        assets: report.assets,
+        totalValue: report.lastBalance,
+        cashBalance: report.cashBalance,
+        totalDividends: report.totalDividends,
+        totalDeposits: report.totalDeposits,
+        lastSyncTime: report.lastSyncTime,
+      );
+    } catch (e) {
+      print('Error getting user portfolio: $e');
+      return null;
+    }
+  }
+
+  /// Розрахунок прогнозу на основі РЕАЛЬНОГО портфеля
+  SimulationResult calculateRealPortfolioSimulation({
+    required List<IBKRAsset> assets,
+    required double currentValue,
+    required int years,
+    required double monthlyContribution,
+    required bool useBot,
+  }) {
+    int totalMonths = years * 12;
+    double totalInvested = monthlyContribution * totalMonths;
+    
+    // Середній ріст на основі реальних активів (або 12% за замовчуванням)
+    double avgGrowth = 0.12;
+    if (assets.isNotEmpty) {
+      // Можна покращити, використовуючи реальні дані росту кожної акції
+      avgGrowth = useBot ? 0.15 : 0.10;
+    }
+    
+    double annualRate = avgGrowth;
+    double monthlyRate = annualRate / 12;
+    
+    // Формула складного відсотка з регулярними внесками:
+    // FV = PV*(1+r)^n + PMT*((1+r)^n - 1)/r
+    double futureValue = currentValue * math.pow(1 + monthlyRate, totalMonths);
+    if (monthlyRate > 0) {
+      futureValue += monthlyContribution * (math.pow(1 + monthlyRate, totalMonths) - 1) / monthlyRate;
+    }
+    
+    double totalContributions = currentValue + totalInvested;
+    double profit = futureValue - totalContributions;
+
+    // Генеруємо точки для графіку
+    List<ProgressPoint> progressPoints = [];
+    int currentYear = DateTime.now().year;
+    
+    for (int y = 0; y <= years; y += (years > 10 ? 2 : 1)) {
+      int months = y * 12;
+      double contributions = currentValue + (monthlyContribution * months);
+      double value = currentValue * math.pow(1 + monthlyRate, months);
+      if (monthlyRate > 0 && months > 0) {
+        value += monthlyContribution * (math.pow(1 + monthlyRate, months) - 1) / monthlyRate;
+      }
+      
+      progressPoints.add(ProgressPoint(
+        year: currentYear + y,
+        value: value,
+        invested: contributions,
+      ));
+    }
+
+    // Рік досягнення мільйона
+    int? yearToMillion;
+    for (int m = 1; m <= totalMonths; m++) {
+      double value = currentValue * math.pow(1 + monthlyRate, m);
+      if (monthlyRate > 0) {
+        value += monthlyContribution * (math.pow(1 + monthlyRate, m) - 1) / monthlyRate;
+      }
+      if (value >= 1000000 && yearToMillion == null) {
+        yearToMillion = currentYear + (m / 12).ceil();
+        break;
+      }
+    }
+
+    return SimulationResult(
+      totalInvested: totalContributions,
+      estimatedValue: futureValue,
+      profit: profit,
+      profitPercent: totalContributions > 0 ? (profit / totalContributions) * 100 : 0,
+      monthlyContribution: monthlyContribution,
+      annualRate: annualRate,
+      progressPoints: progressPoints,
+      yearToMillion: yearToMillion,
+    );
   }
 
   // ============== ВІХИ ==============
@@ -274,4 +381,32 @@ class IBKRComparison {
   });
 
   bool get isAheadOfPlan => realBalance >= simulatedBalance;
+}
+
+/// Реальний портфель користувача
+class UserPortfolio {
+  final List<IBKRAsset> assets;
+  final double totalValue;
+  final double cashBalance;
+  final double totalDividends;
+  final double totalDeposits;
+  final DateTime? lastSyncTime;
+
+  UserPortfolio({
+    required this.assets,
+    required this.totalValue,
+    required this.cashBalance,
+    required this.totalDividends,
+    required this.totalDeposits,
+    this.lastSyncTime,
+  });
+
+  /// Кількість унікальних акцій
+  int get stockCount => assets.length;
+
+  /// Чи є портфель
+  bool get hasPortfolio => assets.isNotEmpty || totalValue > 0;
+
+  /// Список тікерів
+  List<String> get tickers => assets.map((a) => a.symbol).toList();
 }
