@@ -158,10 +158,12 @@ class _SyncSettingsScreenState extends State<SyncSettingsScreen> {
             ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+      body: SafeArea(
+        top: false, // AppBar вже обробляє верх
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -196,6 +198,7 @@ class _SyncSettingsScreenState extends State<SyncSettingsScreen> {
                 ],
               ),
             ),
+      ),
     );
   }
 

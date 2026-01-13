@@ -30,19 +30,22 @@ class IBKRReportDetailsScreen extends StatelessWidget {
             ],
           ),
         ),
-        body: Column(
-          children: [
-            _buildFinancialHeader(),
-            Expanded(
-              child: TabBarView(
-                children: [
-                  _buildAssetsList(),
-                  _buildDividendsList(),
-                  _buildTradesList(),
-                ],
+        body: SafeArea(
+          top: false, // AppBar вже обробляє верх
+          child: Column(
+            children: [
+              _buildFinancialHeader(),
+              Expanded(
+                child: TabBarView(
+                  children: [
+                    _buildAssetsList(),
+                    _buildDividendsList(),
+                    _buildTradesList(),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -31,13 +31,15 @@ class HomeScreen extends StatelessWidget {
         elevation: 0,
         centerTitle: false,
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('users')
-            .doc(userId)
-            .collection('reports')
-            .snapshots(),
-        builder: (context, snapshot) {
+      body: SafeArea(
+        top: false, // AppBar вже обробляє верх
+        child: StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('users')
+              .doc(userId)
+              .collection('reports')
+              .snapshots(),
+          builder: (context, snapshot) {
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
@@ -152,6 +154,7 @@ class HomeScreen extends StatelessWidget {
             ),
           );
         },
+        ),
       ),
     );
   }

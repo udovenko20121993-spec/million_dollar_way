@@ -229,7 +229,10 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
           // СПИСОК УГОД
           _buildTradesList(),
 
-          const SliverToBoxAdapter(child: SizedBox(height: 50)),
+          // Відступ для нижньої панелі навігації
+          SliverToBoxAdapter(
+            child: SizedBox(height: MediaQuery.of(context).padding.bottom + 50),
+          ),
         ],
       ),
     );

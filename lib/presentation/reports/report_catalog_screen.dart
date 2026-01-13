@@ -26,53 +26,56 @@ class IBKRReportCatalogScreen extends StatelessWidget {
         backgroundColor: const Color(0xFF1A1A1A),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('users')
-            .doc(userId)
-            .collection('reports')
-            .orderBy('lastSyncTime', descending: true)
-            .limit(10) // Оптимізація: вантажимо тільки 10 останніх
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(
-              child: Text(
-                "Помилка: ${snapshot.error}",
-                style: const TextStyle(color: Colors.red),
-              ),
-            );
-          }
-
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          final docs = snapshot.data?.docs ?? [];
-
-          if (docs.isEmpty) {
-            return const Center(
-              child: Text("Звітів немає", style: TextStyle(color: Colors.grey)),
-            );
-          }
-
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: docs.length,
-            cacheExtent: 100,
-            itemBuilder: (context, index) {
-              final data = docs[index].data() as Map<String, dynamic>;
-              final reportId = docs[index].id;
-              // Виносимо картку в окремий віджет, щоб він мав свій Progress Bar
-              return ReportCard(
-                key: ValueKey(reportId),
-                data: data,
-                reportId: reportId,
-                userId: userId,
+      body: SafeArea(
+        top: false, // AppBar вже обробляє верх
+        child: StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('users')
+              .doc(userId)
+              .collection('reports')
+              .orderBy('lastSyncTime', descending: true)
+              .limit(10) // Оптимізація: вантажимо тільки 10 останніх
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return Center(
+                child: Text(
+                  "Помилка: ${snapshot.error}",
+                  style: const TextStyle(color: Colors.red),
+                ),
               );
-            },
-          );
-        },
+            }
+
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            final docs = snapshot.data?.docs ?? [];
+
+            if (docs.isEmpty) {
+              return const Center(
+                child: Text("Звітів немає", style: TextStyle(color: Colors.grey)),
+              );
+            }
+
+            return ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: docs.length,
+              cacheExtent: 100,
+              itemBuilder: (context, index) {
+                final data = docs[index].data() as Map<String, dynamic>;
+                final reportId = docs[index].id;
+                // Виносимо картку в окремий віджет, щоб він мав свій Progress Bar
+                return ReportCard(
+                  key: ValueKey(reportId),
+                  data: data,
+                  reportId: reportId,
+                  userId: userId,
+                );
+              },
+            );
+          },
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: const Color(0xFF00C853),

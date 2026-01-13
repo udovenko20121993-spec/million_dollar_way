@@ -15,12 +15,39 @@ class IBKRStatsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F0F),
-      appBar: AppBar(
-        title: const Text("IBKR Аналітика"),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        actions: [
+      // Враховуємо безпечні зони (notch, navigation bar)
+      body: SafeArea(
+        child: _buildContent(context),
+      ),
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
+    return Column(
+      children: [
+        // Кастомний AppBar
+        _buildAppBar(context),
+        // Контент
+        Expanded(child: _buildBody(context)),
+      ],
+    );
+  }
+
+  Widget _buildAppBar(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: Row(
+        children: [
+          const Expanded(
+            child: Text(
+              "IBKR Аналітика",
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
           // Кнопка синхронізації
           StreamBuilder<DocumentSnapshot>(
             stream: FirebaseFirestore.instance
@@ -60,70 +87,69 @@ class IBKRStatsScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('users')
-            .doc(userId)
-            .collection('reports')
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
+    );
+  }
 
-          final docs = snapshot.data!.docs;
-          if (docs.isEmpty) {
-            return const Center(
-              child: Text(
-                "Дані відсутні",
-                style: TextStyle(color: Colors.white),
-              ),
-            );
-          }
+  Widget _buildBody(BuildContext context) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .collection('reports')
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-          docs.sort((a, b) {
-            final tA = (a.data() as Map)['lastSyncTime'];
-            final tB = (b.data() as Map)['lastSyncTime'];
-            if (tA == null) return 1;
-            if (tB == null) return -1;
-            return (tB as Timestamp).compareTo(tA as Timestamp);
-          });
-
-          final report = IBKRReport.fromFirestore(docs.first);
-
-          // Використовуємо DefaultTabController для вкладок всередині екрану
-          return DefaultTabController(
-            length: 2, // Дві головні вкладки: Огляд та Деталі
-            child: Column(
-              children: [
-                const TabBar(
-                  indicatorColor: Color(0xFF00C853),
-                  labelColor: Color(0xFF00C853),
-                  unselectedLabelColor: Colors.grey,
-                  tabs: [
-                    Tab(text: "Головна"),
-                    Tab(text: "Історія & Дивіденди"),
-                  ],
-                ),
-                Expanded(
-                  child: TabBarView(
-                    children: [
-                      // ВКЛАДКА 1: ОГЛЯД (Картки)
-                      _buildOverviewTab(report),
-
-                      // ВКЛАДКА 2: ІСТОРІЯ (Тут вбудовуємо ваш HistoryScreen)
-                      HistoryScreen(
-                        dividends: report.dividends,
-                        trades: report.trades,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+        final docs = snapshot.data!.docs;
+        if (docs.isEmpty) {
+          return const Center(
+            child: Text(
+              "Дані відсутні",
+              style: TextStyle(color: Colors.white),
             ),
           );
-        },
-      ),
+        }
+
+        docs.sort((a, b) {
+          final tA = (a.data() as Map)['lastSyncTime'];
+          final tB = (b.data() as Map)['lastSyncTime'];
+          if (tA == null) return 1;
+          if (tB == null) return -1;
+          return (tB as Timestamp).compareTo(tA as Timestamp);
+        });
+
+        final report = IBKRReport.fromFirestore(docs.first);
+
+        return DefaultTabController(
+          length: 2,
+          child: Column(
+            children: [
+              const TabBar(
+                indicatorColor: Color(0xFF00C853),
+                labelColor: Color(0xFF00C853),
+                unselectedLabelColor: Colors.grey,
+                tabs: [
+                  Tab(text: "Головна"),
+                  Tab(text: "Історія & Дивіденди"),
+                ],
+              ),
+              Expanded(
+                child: TabBarView(
+                  children: [
+                    _buildOverviewTab(report),
+                    HistoryScreen(
+                      dividends: report.dividends,
+                      trades: report.trades,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

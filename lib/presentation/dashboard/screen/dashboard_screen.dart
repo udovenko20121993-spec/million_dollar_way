@@ -30,24 +30,28 @@ class IBKRDashboard extends StatelessWidget {
           ),
         ],
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('users')
-            .doc(userId)
-            .collection('reports')
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData)
-            return const Center(child: CircularProgressIndicator());
+      body: SafeArea(
+        top: false, // AppBar вже обробляє верх
+        child: StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('users')
+              .doc(userId)
+              .collection('reports')
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-          final docs = snapshot.data!.docs;
-          if (docs.isEmpty)
-            return const Center(
-              child: Text(
-                "Дані відсутні.",
-                style: TextStyle(color: Colors.white),
-              ),
-            );
+            final docs = snapshot.data!.docs;
+            if (docs.isEmpty) {
+              return const Center(
+                child: Text(
+                  "Дані відсутні.",
+                  style: TextStyle(color: Colors.white),
+                ),
+              );
+            }
 
           // Сортуємо звіти (найсвіжіший зверху)
           docs.sort((a, b) {
@@ -152,6 +156,7 @@ class IBKRDashboard extends StatelessWidget {
             ),
           );
         },
+        ),
       ),
     );
   }
