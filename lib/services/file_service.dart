@@ -286,12 +286,20 @@ class FileService {
         }
       }
 
-      // ЗМІНА 2: Створюємо метадані файлу і додаємо в історію
+      // ЗМІНА 2: Створюємо метадані файлу з детальною статистикою
       Map<String, dynamic> newFileEntry = {
         'name': customName,
         'uploadTime': DateTime.now().toIso8601String(),
         'status': 'success',
         'error': null,
+        'stats': {
+          'addedTrades': newTrades.length,
+          'addedDividends': newDividends.length,
+          'depositsAmount': calculatedDeposits,
+          'withdrawalsAmount': calculatedWithdrawals,
+          'dividendsAmount': totalDividends,
+          'commissionsAmount': totalCommissions,
+        },
       };
       // Додаємо новий файл в кінець списку
       existingSources.add(newFileEntry);

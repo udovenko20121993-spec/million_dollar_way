@@ -5,6 +5,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:million_dollar_way/services/file_service.dart';
 import 'package:million_dollar_way/services/ibkr_api_service.dart';
+import 'package:million_dollar_way/services/import_preview_service.dart';
+import 'package:million_dollar_way/presentation/reports/import_preview_dialog.dart';
+import 'package:million_dollar_way/presentation/reports/export_dialog.dart';
 
 class IBKRReportCatalogScreen extends StatelessWidget {
   const IBKRReportCatalogScreen({super.key});
@@ -215,6 +218,14 @@ class _ReportCardState extends State<ReportCard> {
                       if (value == 'api')
                         _showApiConfigDialog(context, token, queryId);
                       if (value == 'rename') _showRenameDialog(context, name);
+                      if (value == 'export') {
+                        showExportDialog(
+                          context,
+                          userId: widget.userId,
+                          reportId: widget.reportId,
+                          reportName: name,
+                        );
+                      }
                       if (value == 'delete') _showDeleteConfirmation(context);
                     }
                   },
@@ -222,6 +233,13 @@ class _ReportCardState extends State<ReportCard> {
                     const PopupMenuItem(
                       value: 'api',
                       child: Text('API', style: TextStyle(color: Colors.white)),
+                    ),
+                    const PopupMenuItem(
+                      value: 'export',
+                      child: Text(
+                        '📊 Експорт CSV',
+                        style: TextStyle(color: Color(0xFF00C853)),
+                      ),
                     ),
                     const PopupMenuItem(
                       value: 'rename',
@@ -298,6 +316,7 @@ class _ReportCardState extends State<ReportCard> {
                 String fileName = "";
                 String dateStr = "";
                 bool isSuccess = true;
+                Map<String, dynamic>? stats;
 
                 if (fileItem is String) {
                   fileName = fileItem;
@@ -313,68 +332,17 @@ class _ReportCardState extends State<ReportCard> {
                     } catch (_) {}
                   }
                   isSuccess = fileItem['status'] != 'error';
+                  stats = fileItem['stats'] as Map<String, dynamic>?;
                 }
 
-                return ListTile(
-                  dense: true,
-                  leading: Icon(
-                    isSuccess ? Icons.check_circle : Icons.error,
-                    color: isSuccess
-                        ? const Color(0xFF00C853)
-                        : Colors.redAccent,
-                    size: 20,
-                  ),
-                  title: Text(
-                    fileName,
-                    style: const TextStyle(color: Colors.white70, fontSize: 13),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  subtitle: Text(
-                    dateStr,
-                    style: TextStyle(
-                      color: Colors.grey.withOpacity(0.6),
-                      fontSize: 11,
-                    ),
-                  ),
-                  trailing: PopupMenuButton<String>(
-                    icon: const Icon(
-                      Icons.more_horiz,
-                      size: 18,
-                      color: Colors.grey,
-                    ),
-                    color: const Color(0xFF2C2C2C),
-                    enabled: !_isUploading,
-                    onSelected: (action) {
-                      if (action == 'rename')
-                        _renameFileInHistory(context, sourceFilesRaw, fileItem);
-                      if (action == 'delete')
-                        _deleteFileFromHistory(
-                          context,
-                          sourceFilesRaw,
-                          fileItem,
-                        );
-                    },
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(
-                        value: 'rename',
-                        child: Text(
-                          'Змінити',
-                          style: TextStyle(color: Colors.white, fontSize: 13),
-                        ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Text(
-                          'Видалити',
-                          style: TextStyle(
-                            color: Colors.redAccent,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                return _buildFileHistoryItem(
+                  context,
+                  sourceFilesRaw,
+                  fileItem,
+                  fileName,
+                  dateStr,
+                  isSuccess,
+                  stats,
                 );
               }).toList(),
             ),
@@ -439,9 +407,11 @@ class _ReportCardState extends State<ReportCard> {
     );
   }
 
-  // --- ЛОГІКА ЗАВАНТАЖЕННЯ З ПРОГРЕСОМ ---
+  // --- ЛОГІКА ЗАВАНТАЖЕННЯ З ПРОГРЕСОМ ТА PREVIEW ---
   Future<void> _handleFileUpload(BuildContext context) async {
     final fileService = FileService();
+    final previewService = ImportPreviewService();
+    
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -450,50 +420,69 @@ class _ReportCardState extends State<ReportCard> {
         withData: true,
       );
 
-      if (result != null) {
-        // 1. Початок процесу
+      if (result == null || result.files.isEmpty) return;
+
+      // Обробляємо кожен файл окремо з preview
+      for (var file in result.files) {
+        // 1. Створюємо preview
         setState(() {
           _isUploading = true;
-          _progressValue = 0.1;
-          _statusText = "Підготовка файлів...";
+          _progressValue = 0.2;
+          _statusText = "Аналіз: ${file.name}";
         });
 
-        // Даємо інтерфейсу оновитися
         await Future.delayed(const Duration(milliseconds: 200));
 
-        double step = 0.8 / result.files.length; // Вираховуємо крок прогресу
-        double currentProgress = 0.1;
+        final preview = await previewService.createPreview(
+          file,
+          userId: widget.userId,
+          reportId: widget.reportId,
+        );
 
-        for (var file in result.files) {
-          setState(() {
-            _statusText = "Обробка: ${file.name}";
-            _progressValue = currentProgress;
-          });
-
-          // Даємо час на промальовку тексту
-          await Future.delayed(const Duration(milliseconds: 100));
-
-          // Важка операція (Parse & Upload)
-          await fileService.parseAndMergeReport(
-            widget.userId,
-            widget.reportId,
-            file,
-            file.name,
-          );
-
-          currentProgress += step;
-          setState(() => _progressValue = currentProgress);
-        }
-
-        // 2. Фінал
         setState(() {
-          _progressValue = 1.0;
-          _statusText = "✅ Звіт завантажено успішно!";
+          _isUploading = false;
+          _progressValue = 0;
+          _statusText = "";
         });
 
-        await Future.delayed(
-          const Duration(seconds: 1),
-        ); // Показуємо успіх 1 секунду
+        // 2. Показуємо діалог попереднього перегляду
+        if (!context.mounted) return;
+        
+        final shouldImport = await showImportPreviewDialog(context, preview);
+
+        if (!shouldImport) {
+          // Користувач скасував - переходимо до наступного файлу
+          continue;
+        }
+
+        // 3. Імпортуємо файл
+        setState(() {
+          _isUploading = true;
+          _progressValue = 0.5;
+          _statusText = "Імпорт: ${file.name}";
+        });
+
+        await Future.delayed(const Duration(milliseconds: 100));
+
+        await fileService.parseAndMergeReport(
+          widget.userId,
+          widget.reportId,
+          file,
+          file.name,
+        );
+
+        setState(() {
+          _progressValue = 1.0;
+          _statusText = "✅ ${file.name} імпортовано!";
+        });
+
+        await Future.delayed(const Duration(milliseconds: 800));
+
+        setState(() {
+          _isUploading = false;
+          _progressValue = 0;
+          _statusText = "";
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -501,7 +490,7 @@ class _ReportCardState extends State<ReportCard> {
           _statusText = "Помилка: $e";
           _progressValue = 0.0;
         });
-        await Future.delayed(const Duration(seconds: 3)); // Показуємо помилку
+        await Future.delayed(const Duration(seconds: 3));
       }
     } finally {
       if (mounted) {
@@ -752,6 +741,149 @@ class _ReportCardState extends State<ReportCard> {
             },
           ),
         ],
+      ),
+    );
+  }
+
+  // --- ВІДЖЕТ ЕЛЕМЕНТА ІСТОРІЇ ФАЙЛІВ ЗІ СТАТИСТИКОЮ ---
+  Widget _buildFileHistoryItem(
+    BuildContext context,
+    List<dynamic> sourceFilesRaw,
+    dynamic fileItem,
+    String fileName,
+    String dateStr,
+    bool isSuccess,
+    Map<String, dynamic>? stats,
+  ) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.black12,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        children: [
+          ListTile(
+            dense: true,
+            leading: Icon(
+              isSuccess ? Icons.check_circle : Icons.error,
+              color: isSuccess ? const Color(0xFF00C853) : Colors.redAccent,
+              size: 20,
+            ),
+            title: Text(
+              fileName,
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: Text(
+              dateStr,
+              style: TextStyle(
+                color: Colors.grey.withOpacity(0.6),
+                fontSize: 11,
+              ),
+            ),
+            trailing: PopupMenuButton<String>(
+              icon: const Icon(
+                Icons.more_horiz,
+                size: 18,
+                color: Colors.grey,
+              ),
+              color: const Color(0xFF2C2C2C),
+              enabled: !_isUploading,
+              onSelected: (action) {
+                if (action == 'rename') {
+                  _renameFileInHistory(context, sourceFilesRaw, fileItem);
+                }
+                if (action == 'delete') {
+                  _deleteFileFromHistory(context, sourceFilesRaw, fileItem);
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'rename',
+                  child: Text(
+                    'Змінити',
+                    style: TextStyle(color: Colors.white, fontSize: 13),
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Text(
+                    'Видалити',
+                    style: TextStyle(color: Colors.redAccent, fontSize: 13),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // === СТАТИСТИКА ===
+          if (stats != null) _buildFileStats(stats),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFileStats(Map<String, dynamic> stats) {
+    final trades = stats['addedTrades'] ?? 0;
+    final dividends = stats['addedDividends'] ?? 0;
+    final depositsAmount = (stats['depositsAmount'] ?? 0).toDouble();
+    final withdrawalsAmount = (stats['withdrawalsAmount'] ?? 0).toDouble();
+    final dividendsAmount = (stats['dividendsAmount'] ?? 0).toDouble();
+    final commissionsAmount = (stats['commissionsAmount'] ?? 0).toDouble();
+
+    // Якщо немає даних - не показуємо
+    if (trades == 0 && dividends == 0 && depositsAmount == 0 && dividendsAmount == 0) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(left: 56, right: 16, bottom: 8),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 4,
+        children: [
+          if (trades > 0)
+            _buildStatChip('📊 $trades угод', Colors.blueAccent),
+          if (dividends > 0)
+            _buildStatChip(
+              '💰 +\$${dividendsAmount.toStringAsFixed(0)}',
+              Colors.orangeAccent,
+            ),
+          if (depositsAmount > 0)
+            _buildStatChip(
+              '⬆️ +\$${depositsAmount.toStringAsFixed(0)}',
+              Colors.greenAccent,
+            ),
+          if (withdrawalsAmount > 0)
+            _buildStatChip(
+              '⬇️ -\$${withdrawalsAmount.toStringAsFixed(0)}',
+              Colors.orange,
+            ),
+          if (commissionsAmount > 0)
+            _buildStatChip(
+              '💸 -\$${commissionsAmount.toStringAsFixed(2)}',
+              Colors.redAccent,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatChip(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.w500,
+        ),
       ),
     );
   }
