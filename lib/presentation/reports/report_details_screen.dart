@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:million_dollar_way/models/ibkr_data.dart';
+import 'package:million_dollar_way/domain/models/ibkr_data.dart';
 
 class IBKRReportDetailsScreen extends StatelessWidget {
   final IBKRReport report;
@@ -30,19 +30,22 @@ class IBKRReportDetailsScreen extends StatelessWidget {
             ],
           ),
         ),
-        body: Column(
-          children: [
-            _buildFinancialHeader(),
-            Expanded(
-              child: TabBarView(
-                children: [
-                  _buildAssetsList(),
-                  _buildDividendsList(),
-                  _buildTradesList(),
-                ],
+        body: SafeArea(
+          top: false, // AppBar вже обробляє верх
+          child: Column(
+            children: [
+              _buildFinancialHeader(),
+              Expanded(
+                child: TabBarView(
+                  children: [
+                    _buildAssetsList(),
+                    _buildDividendsList(),
+                    _buildTradesList(),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -112,7 +115,7 @@ class IBKRReportDetailsScreen extends StatelessWidget {
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.05),
+            color: Colors.white.withAlpha(13),
             borderRadius: BorderRadius.circular(12),
           ),
           child: ListTile(
@@ -184,20 +187,28 @@ class IBKRReportDetailsScreen extends StatelessWidget {
             itemBuilder: (context, index) {
               final div = report.dividends[index];
               // Форматуємо дату, якщо вона є
-              String dateStr = div.date;
+              String dateStr = div.date.toString();
               try {
                 // IBKR іноді дає формат yyyyMMdd або yyyy-MM-dd
-                if (div.date.length == 8) {
+                if (dateStr.length == 8) {
                   dateStr =
-                      "${div.date.substring(6, 8)}.${div.date.substring(4, 6)}.${div.date.substring(0, 4)}";
+                      "${dateStr.substring(6, 8)}.${dateStr.substring(4, 6)}.${dateStr.substring(0, 4)}";
+                } else {
+                  // Форматуємо DateTime у стандартний формат dd.MM.yyyy
+                  dateStr =
+                      "${div.date.day.toString().padLeft(2, '0')}.${div.date.month.toString().padLeft(2, '0')}.${div.date.year}";
                 }
-              } catch (_) {}
+              } catch (_) {
+                // Якщо щось пішло не так, використовуємо стандартний формат
+                dateStr =
+                    "${div.date.day.toString().padLeft(2, '0')}.${div.date.month.toString().padLeft(2, '0')}.${div.date.year}";
+              }
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ListTile(
                   leading: CircleAvatar(
-                    backgroundColor: Colors.green.withOpacity(0.2),
+                    backgroundColor: Colors.green.withAlpha(51),
                     child: const Icon(
                       Icons.attach_money,
                       color: Colors.green,
@@ -248,7 +259,7 @@ class IBKRReportDetailsScreen extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 8),
           decoration: BoxDecoration(
             border: Border(
-              bottom: BorderSide(color: Colors.white.withOpacity(0.1)),
+              bottom: BorderSide(color: Colors.white.withAlpha(26)),
             ),
           ),
           child: ListTile(
@@ -257,8 +268,8 @@ class IBKRReportDetailsScreen extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: isBuy
-                    ? Colors.green.withOpacity(0.2)
-                    : Colors.red.withOpacity(0.2),
+                    ? Colors.green.withAlpha(51)
+                    : Colors.red.withAlpha(51),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(

@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- >;>B89 3@04VT=B -->
+    <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFD700;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#D4AF37;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#B8860B;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- "5<=89 3@04VT=B 4;O D>=C -->
+    <linearGradient id="darkGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#1A1A1A;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0F0F0F;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- !2VBV==O -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="20" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <!-- "V=L -->
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="15" flood-color="#D4AF37" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+  
+  <!-- $>= -->
+  <rect width="1024" height="1024" rx="200" fill="url(#darkGradient)"/>
+  
+  <!-- 5:>@0B82=5 :>;> -->
+  <circle cx="512" cy="512" r="380" fill="none" stroke="url(#goldGradient)" stroke-width="3" opacity="0.3"/>
+  
+  <!-- @0DV: @>ABC (;V=VO) -->
+  <path d="M 200 700 Q 350 650 450 550 T 600 400 T 750 250 L 800 180" 
+        fill="none" 
+        stroke="url(#goldGradient)" 
+        stroke-width="8" 
+        stroke-linecap="round"
+        opacity="0.5"/>
+  
+  <!-- !B@V;:0 23>@C -->
+  <polygon points="800,180 750,230 770,230 770,280 830,280 830,230 850,230" 
+           fill="url(#goldGradient)" 
+           opacity="0.5"
+           transform="rotate(-45, 800, 230)"/>
+  
+  <!-- >;>2=0 ?V@0<V40/3>@0 -->
+  <path d="M 512 200 L 780 700 L 244 700 Z" 
+        fill="url(#goldGradient)" 
+        filter="url(#shadow)"/>
+  
+  <!-- =CB@VH=O ;V=VO ?V@0<V48 -->
+  <path d="M 512 280 L 700 620 L 324 620 Z" 
+        fill="none" 
+        stroke="#0F0F0F" 
+        stroke-width="4"
+        opacity="0.3"/>
+  
+  <!-- !8<2>; 4>;0@0 -->
+  <text x="512" y="520" 
+        font-family="Arial, sans-serif" 
+        font-size="200" 
+        font-weight="bold" 
+        fill="#0F0F0F" 
+        text-anchor="middle"
+        opacity="0.9">$</text>
+  
+  <!-- V@:0 =0 25@H8=V -->
+  <polygon points="512,120 525,160 570,160 535,190 548,235 512,210 476,235 489,190 454,160 499,160" 
+           fill="#FFD700" 
+           filter="url(#glow)"/>
+  
+  <!-- 0;0 7V@:0 ;V2>@CG -->
+  <polygon points="280,300 287,320 308,320 292,335 298,356 280,342 262,356 268,335 252,320 273,320" 
+           fill="#D4AF37" 
+           opacity="0.6"/>
+  
+  <!-- 0;0 7V@:0 ?@02>@CG -->
+  <polygon points="744,300 751,320 772,320 756,335 762,356 744,342 726,356 732,335 716,320 737,320" 
+           fill="#D4AF37" 
+           opacity="0.6"/>
+           
+  <!-- C:20 M 2=87C -->
+  <text x="512" y="850" 
+        font-family="Arial, sans-serif" 
+        font-size="100" 
+        font-weight="bold" 
+        fill="url(#goldGradient)" 
+        text-anchor="middle"
+        letter-spacing="30">MDW</text>
+</svg>

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'midas_data.dart'; // Підключаємо файл з даними
+import '../../services/stock_logo_service.dart';
 
 class StockDetailScreen extends StatelessWidget {
   final Map<String, dynamic> stock;
@@ -49,19 +50,11 @@ class StockDetailScreen extends StatelessWidget {
                 Center(
                   child: Column(
                     children: [
-                      CircleAvatar(
-                        radius: 35,
-                        backgroundColor: const Color(
-                          0xFFD4AF37,
-                        ).withOpacity(0.1),
-                        child: Text(
-                          stock['symbol'][0],
-                          style: const TextStyle(
-                            color: Color(0xFFD4AF37),
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                      // Логотип акції
+                      StockLogo(
+                        symbol: stock['symbol'],
+                        size: 70,
+                        backgroundColor: Colors.white,
                       ),
                       const SizedBox(height: 15),
                       Text(
