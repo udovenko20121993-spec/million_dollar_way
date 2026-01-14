@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- >;>B89 3@04VT=B -->
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFD700"/>
+      <stop offset="50%" style="stop-color:#D4AF37"/>
+      <stop offset="100%" style="stop-color:#B8860B"/>
+    </linearGradient>
+    
+    <!-- 5;5=89 4;O 3@0DV:0 -->
+    <linearGradient id="green" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" style="stop-color:#00C853"/>
+      <stop offset="100%" style="stop-color:#69F0AE"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- "5<=89 D>= 7 70>:@C3;5=8<8 :CB0<8 -->
+  <rect width="1024" height="1024" rx="220" fill="#0F0F0F"/>
+  
+  <!-- >;>B5 :V;LF5 -->
+  <circle cx="512" cy="512" r="400" fill="none" stroke="url(#gold)" stroke-width="40"/>
+  
+  <!-- @0DV: @>ABC -->
+  <path d="M 280 680 
+           L 380 580 
+           L 480 620 
+           L 580 480 
+           L 680 520 
+           L 780 320" 
+        fill="none" 
+        stroke="url(#green)" 
+        stroke-width="50" 
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+  
+  <!-- !B@V;:0 23>@C -->
+  <polygon points="780,320 820,380 795,380 795,420 765,420 765,380 740,380" 
+           fill="#00C853"
+           transform="rotate(-45, 780, 370)"/>
+  
+  <!-- !8<2>; 4>;0@0 2 F5=B@V -->
+  <text x="512" y="600" 
+        font-family="Arial Black, sans-serif" 
+        font-size="350" 
+        font-weight="900" 
+        fill="url(#gold)" 
+        text-anchor="middle">$</text>
+</svg>

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- >;>B89 3@04VT=B -->
+    <linearGradient id="goldModern" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#F4D03F"/>
+      <stop offset="100%" style="stop-color:#D4AF37"/>
+    </linearGradient>
+    
+    <!-- !2VBV==O -->
+    <filter id="modernGlow">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- $>= -->
+  <rect width="1024" height="1024" rx="230" fill="#0F0F0F"/>
+  
+  <!-- !B8;V7>20=0 1C:20 M O: 3>@0 7 3@0DV:>< -->
+  <path d="M 200 750 
+           L 200 500 
+           L 380 280 
+           L 512 450 
+           L 644 280 
+           L 824 500 
+           L 824 750" 
+        fill="none" 
+        stroke="url(#goldModern)" 
+        stroke-width="80" 
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        filter="url(#modernGlow)"/>
+  
+  <!-- ">G:0 =0 25@H8=V (FV;L) -->
+  <circle cx="380" cy="280" r="40" fill="#00C853"/>
+  <circle cx="644" cy="280" r="40" fill="#00C853"/>
+  
+  <!-- V@:0 =0 3>;>2=V9 25@H8=V -->
+  <circle cx="512" cy="200" r="50" fill="#FFD700" filter="url(#modernGlow)"/>
+  
+  <!-- V=VO 4> <V;L9>=0 -->
+  <line x1="512" y1="250" x2="512" y2="400" stroke="#FFD700" stroke-width="4" stroke-dasharray="10,10"/>
+</svg>
