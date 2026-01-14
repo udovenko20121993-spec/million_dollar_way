@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
+<<<<<<< Current (Your changes)
+import 'package:million_dollar_way/domain/models/ibkr_data.dart';
+=======
 import 'package:million_dollar_way/models/ibkr_data.dart';
+import 'package:million_dollar_way/services/stock_logo_service.dart';
+>>>>>>> Incoming (Background Agent changes)
 
 class StockDetailScreen extends StatefulWidget {
   final IBKRAsset asset;
@@ -86,30 +91,12 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const SizedBox(height: 50),
-                    // Лого
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        color: _mainColor.withOpacity(0.1),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: _mainColor.withOpacity(0.5),
-                          width: 2,
-                        ),
-                      ),
-                      child: Center(
-                        child: Text(
-                          widget.asset.symbol.isNotEmpty
-                              ? widget.asset.symbol.substring(0, 1)
-                              : "?",
-                          style: TextStyle(
-                            color: _mainColor,
-                            fontSize: 26,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
+                    // Логотип компанії
+                    StockLogo(
+                      symbol: widget.asset.symbol,
+                      size: 70,
+                      backgroundColor: Colors.white,
+                      fallbackColor: _mainColor,
                     ),
                     const SizedBox(height: 10),
                     // Ціна
@@ -205,7 +192,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
                       Text(
                         "Останні операції",
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.9),
+                          color: Colors.white.withAlpha(230),
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
@@ -229,7 +216,10 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
           // СПИСОК УГОД
           _buildTradesList(),
 
-          const SliverToBoxAdapter(child: SizedBox(height: 50)),
+          // Відступ для нижньої панелі навігації
+          SliverToBoxAdapter(
+            child: SizedBox(height: MediaQuery.of(context).padding.bottom + 50),
+          ),
         ],
       ),
     );
@@ -246,7 +236,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFF1E1E1E),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        border: Border.all(color: Colors.white.withAlpha(13)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -304,7 +294,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
           decoration: BoxDecoration(
             color: const Color(0xFF1A1A1A),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withOpacity(0.05)),
+            border: Border.all(color: Colors.white.withAlpha(13)),
           ),
           child: ListTile(
             contentPadding: const EdgeInsets.symmetric(
@@ -314,7 +304,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
             leading: Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: tradeColor.withOpacity(0.15),
+                color: tradeColor.withAlpha(38),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -336,7 +326,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
               children: [
                 const SizedBox(height: 4),
                 Text(
-                  _simpleDate(trade.date),
+                  _simpleDate(trade.date.toIso8601String().split('T')[0]),
                   style: const TextStyle(color: Colors.grey, fontSize: 12),
                 ),
                 const SizedBox(height: 2),

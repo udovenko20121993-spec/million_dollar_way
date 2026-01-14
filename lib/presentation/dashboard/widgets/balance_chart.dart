@@ -1,7 +1,7 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:million_dollar_way/models/ibkr_data.dart';
+import 'package:million_dollar_way/domain/models/ibkr_data.dart';
 
 class BalanceChart extends StatefulWidget {
   final List<IBKRTrade> trades;
@@ -33,7 +33,7 @@ class _BalanceChartState extends State<BalanceChart> {
     List<FlSpot> tempSpots = [];
 
     if (sortedTrades.isNotEmpty) {
-      DateTime firstDate = _parseDate(sortedTrades.first.date);
+      DateTime firstDate = sortedTrades.first.date;
       tempSpots.add(
         FlSpot(
           firstDate
@@ -57,7 +57,7 @@ class _BalanceChartState extends State<BalanceChart> {
         if (currentInvestedValue < 0) currentInvestedValue = 0;
       }
 
-      DateTime date = _parseDate(trade.date);
+      DateTime date = trade.date;
       tempSpots.add(
         FlSpot(date.millisecondsSinceEpoch.toDouble(), currentInvestedValue),
       );
@@ -116,18 +116,6 @@ class _BalanceChartState extends State<BalanceChart> {
     });
   }
 
-  DateTime _parseDate(String dateStr) {
-    String cleanDate = dateStr.contains(';') ? dateStr.split(';')[0] : dateStr;
-    try {
-      if (cleanDate.length == 8) {
-        return DateTime.parse(
-          "${cleanDate.substring(0, 4)}-${cleanDate.substring(4, 6)}-${cleanDate.substring(6, 8)}",
-        );
-      }
-    } catch (_) {}
-    return DateTime.now();
-  }
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -181,19 +169,19 @@ class _BalanceChartState extends State<BalanceChart> {
                         show: true,
                         drawVerticalLine: false,
                         getDrawingHorizontalLine: (value) => FlLine(
-                          color: Colors.white.withOpacity(0.05),
+                          color: Colors.white.withAlpha(13),
                           strokeWidth: 1,
                         ),
                       ),
                       titlesData: FlTitlesData(
                         show: true,
-                        rightTitles: AxisTitles(
+                        rightTitles: const AxisTitles(
                           sideTitles: SideTitles(showTitles: false),
                         ),
-                        topTitles: AxisTitles(
+                        topTitles: const AxisTitles(
                           sideTitles: SideTitles(showTitles: false),
                         ),
-                        bottomTitles: AxisTitles(
+                        bottomTitles: const AxisTitles(
                           sideTitles: SideTitles(
                             showTitles: false,
                           ), // Прибираємо дати знизу для компактності
@@ -228,12 +216,12 @@ class _BalanceChartState extends State<BalanceChart> {
                           color: Colors.blueAccent,
                           barWidth: 2,
                           isStrokeCapRound: true,
-                          dotData: FlDotData(show: false),
+                          dotData: const FlDotData(show: false),
                           belowBarData: BarAreaData(
                             show: true,
                             gradient: LinearGradient(
                               colors: [
-                                Colors.blueAccent.withOpacity(0.3),
+                                Colors.blueAccent.withAlpha(77),
                                 Colors.transparent,
                               ],
                               begin: Alignment.topCenter,
@@ -289,9 +277,7 @@ class _BalanceChartState extends State<BalanceChart> {
             color: isSelected ? Colors.blueAccent : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: isSelected
-                  ? Colors.blueAccent
-                  : Colors.grey.withOpacity(0.2),
+              color: isSelected ? Colors.blueAccent : Colors.grey.withAlpha(51),
             ),
           ),
           child: Text(

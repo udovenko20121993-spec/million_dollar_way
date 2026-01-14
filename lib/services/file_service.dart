@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:xml/xml.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'ibkr_parser.dart';
+import 'nbu_exchange_rate_service.dart';
 
 class FileService {
   Future<Map<String, dynamic>> parseAndMergeReport(
@@ -100,6 +102,17 @@ class FileService {
         String transId = tx.getAttribute('transactionID') ?? '';
         String currency = tx.getAttribute('currency') ?? 'USD';
 
+        final typeLower = type.toLowerCase();
+        final descLower = desc.toLowerCase();
+        final isDividendCashTx =
+            type.startsWith('Dividend') || type == 'PaymentInLieuOfDividends';
+        final isWithholdingTax =
+            typeLower.contains('withholding') ||
+            descLower.contains('withholding') ||
+            (typeLower.contains('tax') &&
+                (descLower.contains('dividend') ||
+                    descLower.contains('withholding')));
+
         Map<String, dynamic> rawTx = {
           'date': date,
           'type': type,
@@ -120,13 +133,14 @@ class FileService {
 
         if (isExternalFlow) {
           newCashTrans.add(rawTx);
-        } else if (type.startsWith('Dividend') ||
-            type == 'PaymentInLieuOfDividends') {
+        } else if (isDividendCashTx || isWithholdingTax) {
           newDividends.add({
             'date': date,
             'symbol': symbol.isEmpty ? 'DIV' : symbol,
             'amount': amountUSD,
-            'description': desc,
+            'description': desc.isEmpty
+                ? (isWithholdingTax ? 'Withholding Tax' : 'Dividend')
+                : desc,
           });
         }
       }
@@ -157,15 +171,163 @@ class FileService {
       }
 
       // В) Угоди (Trades) + КОМІСІЇ
+      final tradeParser = IBKRRarser(); // Note: Class name has typo but keeping for compatibility
+      final nbuService = NbuExchangeRateService();
+      final baseCurrency =
+          flexStatement.getAttribute('baseCurrency') ??
+          flexStatement.getAttribute('currency') ??
+          'USD';
       final allTrades = flexStatement.findAllElements('Trade');
+
+      print('Початок розрахунку (NBU rates + trades)');
+
+      String rateKey(String currency, DateTime date) {
+        final d = DateTime(date.year, date.month, date.day);
+        return '${currency.toUpperCase()}_${d.toIso8601String()}';
+      }
+
+      final rateCache = <String, NbuRateResult?>{};
+      final pendingRequests = <Future<void>>[];
+      var totalPlanned = 0;
+      var completed = 0;
+
+      Future<void> prefetchRate(String currency, DateTime date) async {
+        final key = rateKey(currency, date);
+        if (rateCache.containsKey(key)) return;
+        totalPlanned += 1;
+        try {
+          final r = await nbuService.tryGetRateToUah(
+            currency: currency,
+            date: date,
+          );
+          rateCache[key] = r;
+        } catch (e) {
+          rateCache[key] = null;
+        } finally {
+          completed += 1;
+          if (completed == totalPlanned || completed % 25 == 0) {
+            // Progress logging removed for production
+          }
+        }
+      }
+
+      DateTime? parseTradeDate(String tradeDateStr) {
+        if (tradeDateStr.isEmpty) return null;
+        return DateTime.tryParse(tradeDateStr) ??
+            DateTime.tryParse(tradeDateStr.split(' ').first);
+      }
+
+      final tradeInfos = <Map<String, dynamic>>[];
+
       for (var trade in allTrades) {
         if (trade.getAttribute('assetCategory') == 'Total' ||
             trade.getAttribute('symbol') == null) {
           continue;
         }
 
+        final parsed = tradeParser.parseTradeNode(trade);
+
+        final tradeDateStr = trade.getAttribute('dateTime') ?? '';
+        final tradeDate = parseTradeDate(tradeDateStr);
+
         double comm =
             double.tryParse(trade.getAttribute('ibCommission') ?? "0") ?? 0;
+
+        final priceCurrency =
+            parsed?.price.currency ?? trade.getAttribute('currency') ?? 'USD';
+        final commissionCurrency =
+            parsed?.commission.currency ??
+            trade.getAttribute('ibCommissionCurrency') ??
+            trade.getAttribute('currency') ??
+            'USD';
+
+        final fxRateToBase = double.tryParse(
+          trade.getAttribute('fxRateToBase') ?? '',
+        );
+
+        tradeInfos.add({
+          'trade': trade,
+          'parsed': parsed,
+          'tradeDateStr': tradeDateStr,
+          'tradeDate': tradeDate,
+          'comm': comm,
+          'priceCurrency': priceCurrency,
+          'commissionCurrency': commissionCurrency,
+          'fxRateToBase': fxRateToBase,
+        });
+
+        if (tradeDate != null) {
+          pendingRequests.add(prefetchRate(priceCurrency, tradeDate));
+          pendingRequests.add(prefetchRate(commissionCurrency, tradeDate));
+          if (fxRateToBase != null && fxRateToBase != 0) {
+            pendingRequests.add(prefetchRate(baseCurrency, tradeDate));
+          }
+        }
+      }
+
+      try {
+        await Future.wait(pendingRequests);
+      } catch (e) {
+        rethrow;
+      }
+
+      for (final info in tradeInfos) {
+        final trade = info['trade'] as XmlElement;
+        final tradeDateStr = info['tradeDateStr'] as String;
+        final tradeDate = info['tradeDate'] as DateTime?;
+        final comm = info['comm'] as double;
+        final priceCurrency = info['priceCurrency'] as String;
+        final commissionCurrency = info['commissionCurrency'] as String;
+        final fxRateToBase = info['fxRateToBase'] as double?;
+
+        NbuRateResult? priceRate;
+        NbuRateResult? commissionRate;
+        if (tradeDate != null) {
+          priceRate = rateCache[rateKey(priceCurrency, tradeDate)];
+          commissionRate = rateCache[rateKey(commissionCurrency, tradeDate)];
+
+          if (priceRate == null && fxRateToBase != null && fxRateToBase != 0) {
+            final baseRate = rateCache[rateKey(baseCurrency, tradeDate)];
+            if (baseRate != null) {
+              final computed = baseRate.rateToUah * fxRateToBase;
+              priceRate = NbuRateResult(
+                requestedCurrency: priceCurrency,
+                nbuCurrency: baseCurrency,
+                requestedDate: DateTime(
+                  tradeDate.year,
+                  tradeDate.month,
+                  tradeDate.day,
+                ),
+                rateDate: baseRate.rateDate,
+                rateToUah: computed,
+              );
+            } else {
+              print(
+                'NBU rate warning: cannot compute cross-rate for $priceCurrency because base currency $baseCurrency rate is unavailable',
+              );
+            }
+          }
+
+          if (commissionRate == null &&
+              commissionCurrency == priceCurrency &&
+              priceRate != null) {
+            commissionRate = priceRate;
+          }
+        } else {
+          print(
+            "NBU rate warning: cannot parse trade date \"$tradeDateStr\" for ${trade.getAttribute('symbol')}",
+          );
+        }
+
+        final priceValue =
+            double.tryParse(trade.getAttribute('tradePrice') ?? "0") ?? 0;
+
+        final double? priceUah = priceRate != null
+            ? nbuService.roundUah(priceValue * priceRate.rateToUah)
+            : null;
+        final double? commissionUah = commissionRate != null
+            ? nbuService.roundUah(comm * commissionRate.rateToUah)
+            : null;
 
         newTrades.add({
           'date': trade.getAttribute('dateTime') ?? '',
@@ -173,12 +335,23 @@ class FileService {
           'action': trade.getAttribute('buySell') ?? '',
           'quantity':
               double.tryParse(trade.getAttribute('quantity') ?? "0") ?? 0,
-          'price':
-              double.tryParse(trade.getAttribute('tradePrice') ?? "0") ?? 0,
+          'price': priceValue,
+          'priceCurrency': priceCurrency,
+          'priceRateToUah': priceRate?.rateToUah,
+          'priceRateDate': priceRate?.rateDate.toIso8601String(),
+          'priceUah': priceUah,
           'cost': double.tryParse(trade.getAttribute('cost') ?? "0") ?? 0,
           'commission': comm,
+          'commissionCurrency': commissionCurrency,
+          'commissionRateToUah': commissionRate?.rateToUah,
+          'commissionRateDate': commissionRate?.rateDate.toIso8601String(),
+          'commissionUah': commissionUah,
         });
       }
+
+      print('Розрахунок FIFO завершено');
+
+      nbuService.dispose();
 
       // Г) Баланс (NAV)
       double newNetValue = 0;
@@ -245,7 +418,7 @@ class FileService {
       final uniqueTrades = _removeDuplicates(
         existingTrades,
         (item) =>
-            "${item['date']}_${item['symbol']}_${item['action']}_${item['quantity']}_${item['price']}",
+            "${item['date']}_${item['symbol']}_${item['action']}_${item['quantity']}_${item['price']}_${item['priceCurrency']}_${item['commission']}_${item['commissionCurrency']}",
       );
 
       existingDividends.addAll(newDividends);
@@ -286,12 +459,20 @@ class FileService {
         }
       }
 
-      // ЗМІНА 2: Створюємо метадані файлу і додаємо в історію
+      // ЗМІНА 2: Створюємо метадані файлу з детальною статистикою
       Map<String, dynamic> newFileEntry = {
         'name': customName,
         'uploadTime': DateTime.now().toIso8601String(),
         'status': 'success',
         'error': null,
+        'stats': {
+          'addedTrades': newTrades.length,
+          'addedDividends': newDividends.length,
+          'depositsAmount': calculatedDeposits,
+          'withdrawalsAmount': calculatedWithdrawals,
+          'dividendsAmount': totalDividends,
+          'commissionsAmount': totalCommissions,
+        },
       };
       // Додаємо новий файл в кінець списку
       existingSources.add(newFileEntry);
@@ -339,7 +520,6 @@ class FileService {
         'isDuplicate': false,
       };
     } catch (e) {
-      print("FILE SERVICE ERROR: $e");
       rethrow;
     }
   }

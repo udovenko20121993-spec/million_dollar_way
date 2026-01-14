@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:million_dollar_way/models/ibkr_data.dart';
+import 'package:million_dollar_way/domain/models/ibkr_data.dart';
 
 class HistoryScreen extends StatelessWidget {
   final List<IBKRDividend> dividends;
@@ -76,7 +76,7 @@ class HistoryScreen extends StatelessWidget {
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.05),
+            color: Colors.white.withAlpha(13),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: Colors.white10),
           ),
@@ -84,7 +84,7 @@ class HistoryScreen extends StatelessWidget {
             data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
             child: ExpansionTile(
               leading: CircleAvatar(
-                backgroundColor: const Color(0xFF00C853).withOpacity(0.2),
+                backgroundColor: const Color(0xFF00C853).withAlpha(51),
                 child: Text(
                   symbol.substring(0, 1),
                   style: const TextStyle(
@@ -113,7 +113,7 @@ class HistoryScreen extends StatelessWidget {
                 ),
               ),
               children: history.map((div) {
-                String dateStr = _formatDate(div.date);
+                String dateStr = _formatDate(div.date.toIso8601String());
                 return Container(
                   color: Colors.black12,
                   child: ListTile(
@@ -192,7 +192,7 @@ class HistoryScreen extends StatelessWidget {
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.05),
+            color: Colors.white.withAlpha(13),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: Colors.white10),
           ),
@@ -201,7 +201,7 @@ class HistoryScreen extends StatelessWidget {
             child: ExpansionTile(
               // ЗАГОЛОВОК ГРУПИ
               leading: CircleAvatar(
-                backgroundColor: Colors.blueAccent.withOpacity(0.2),
+                backgroundColor: Colors.blueAccent.withAlpha(51),
                 child: Text(
                   symbol.isNotEmpty ? symbol.substring(0, 1) : "?",
                   style: const TextStyle(
@@ -249,7 +249,7 @@ class HistoryScreen extends StatelessWidget {
               // ДЕТАЛІ (СПИСОК УГОД)
               children: history.map((trade) {
                 bool isBuy = trade.action.toUpperCase() == 'BUY';
-                String dateStr = _formatDate(trade.date);
+                String dateStr = _formatDate(trade.date as String);
                 double total = trade.price * trade.quantity;
 
                 return Container(

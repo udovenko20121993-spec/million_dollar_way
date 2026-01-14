@@ -1,10 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 // Переконайся, що шлях правильний.
 // Якщо файли просто в папці lib, видали 'presentation/road_to_million/'
 import 'presentation/road_to_million/midas_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Ініціалізуємо Firebase
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    print('Firebase initialization error: $e');
+    // Продовжуємо роботу навіть якщо Firebase не ініціалізовано
+  }
+  
   // Гарантуємо, що системний рядок (годинник, батарея) буде прозорим/темним
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(

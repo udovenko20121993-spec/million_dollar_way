@@ -1,7 +1,7 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../../../models/ibkr_data.dart';
+import '../../../domain/models/ibkr_data.dart';
 
 class CapitalChart extends StatefulWidget {
   final List<IBKRTrade> trades;
@@ -45,7 +45,7 @@ class _CapitalChartState extends State<CapitalChart> {
 
     // Додаємо стартову точку (0)
     if (sortedTrades.isNotEmpty) {
-      DateTime firstDate = _parseDate(sortedTrades.first.date);
+      DateTime firstDate = sortedTrades.first.date;
       tempSpots.add(
         FlSpot(
           firstDate
@@ -70,7 +70,7 @@ class _CapitalChartState extends State<CapitalChart> {
         if (currentBalance < 0) currentBalance = 0;
       }
 
-      DateTime date = _parseDate(trade.date);
+      DateTime date = trade.date;
       tempSpots.add(
         FlSpot(date.millisecondsSinceEpoch.toDouble(), currentBalance),
       );
@@ -79,19 +79,6 @@ class _CapitalChartState extends State<CapitalChart> {
     setState(() {
       _spots = tempSpots;
     });
-  }
-
-  DateTime _parseDate(String dateStr) {
-    // Обробка формату IBKR (20250121 або 20250121;153020)
-    String cleanDate = dateStr.contains(';') ? dateStr.split(';')[0] : dateStr;
-    try {
-      if (cleanDate.length == 8) {
-        return DateTime.parse(
-          "${cleanDate.substring(0, 4)}-${cleanDate.substring(4, 6)}-${cleanDate.substring(6, 8)}",
-        );
-      }
-    } catch (_) {}
-    return DateTime.now();
   }
 
   @override
@@ -140,7 +127,7 @@ class _CapitalChartState extends State<CapitalChart> {
                   show: true,
                   gradient: LinearGradient(
                     colors: [
-                      const Color(0xFF00C853).withOpacity(0.3),
+                      const Color(0xFF00C853).withAlpha(77),
                       Colors.transparent,
                     ],
                     begin: Alignment.topCenter,
