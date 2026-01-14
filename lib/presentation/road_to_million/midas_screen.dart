@@ -31,8 +31,8 @@ class _MidasScreenState extends State<MidasScreen> with SingleTickerProviderStat
   late TextEditingController _amountController;
   SortType _currentSort = SortType.profitDesc;
 
-  late List<Map<String, dynamic>> _analyticsPortfolio;
-  int _stockCount = tickersList.length;
+  List<Map<String, dynamic>> _analyticsPortfolio = [];
+  int _stockCount = 51; // Початкове значення
   
   // Ціни акцій
   Map<String, StockInfo> _stockPrices = {};
@@ -61,6 +61,9 @@ class _MidasScreenState extends State<MidasScreen> with SingleTickerProviderStat
     _yearsController = TextEditingController(text: _years.toString());
     _amountController = TextEditingController(text: _weeklyPerStock.toString());
     
+    // Ініціалізуємо кількість акцій
+    _stockCount = tickersList.length;
+    
     _progressAnimationController = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
@@ -69,8 +72,26 @@ class _MidasScreenState extends State<MidasScreen> with SingleTickerProviderStat
       CurvedAnimation(parent: _progressAnimationController, curve: Curves.easeOutCubic),
     );
     
+    // Ініціалізуємо пустий портфель
+    _initEmptyPortfolio();
+    
     _loadPrices();
     _loadSettings();
+  }
+  
+  void _initEmptyPortfolio() {
+    _analyticsPortfolio = tickersList.map((ticker) {
+      return {
+        'symbol': ticker,
+        'name': ticker,
+        'qty': 0.0,
+        'avgPrice': 0.0,
+        'currentPrice': 0.0,
+        'totalValue': 0.0,
+        'profit': 0.0,
+        'profitPercent': 0.0,
+      };
+    }).toList();
   }
 
   Future<void> _loadPrices() async {
