@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:million_dollar_way/models/ibkr_data.dart';
+import 'package:million_dollar_way/services/stock_logo_service.dart';
 
 class StockDetailScreen extends StatefulWidget {
   final IBKRAsset asset;
@@ -86,30 +87,12 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const SizedBox(height: 50),
-                    // Лого
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        color: _mainColor.withOpacity(0.1),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: _mainColor.withOpacity(0.5),
-                          width: 2,
-                        ),
-                      ),
-                      child: Center(
-                        child: Text(
-                          widget.asset.symbol.isNotEmpty
-                              ? widget.asset.symbol.substring(0, 1)
-                              : "?",
-                          style: TextStyle(
-                            color: _mainColor,
-                            fontSize: 26,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
+                    // Логотип компанії
+                    StockLogo(
+                      symbol: widget.asset.symbol,
+                      size: 70,
+                      backgroundColor: Colors.white,
+                      fallbackColor: _mainColor,
                     ),
                     const SizedBox(height: 10),
                     // Ціна
@@ -229,7 +212,10 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
           // СПИСОК УГОД
           _buildTradesList(),
 
-          const SliverToBoxAdapter(child: SizedBox(height: 50)),
+          // Відступ для нижньої панелі навігації
+          SliverToBoxAdapter(
+            child: SizedBox(height: MediaQuery.of(context).padding.bottom + 50),
+          ),
         ],
       ),
     );

@@ -1,45 +1,35 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-// Переконайся, що шлях правильний.
-// Якщо файли просто в папці lib, видали 'presentation/road_to_million/'
-import 'presentation/road_to_million/midas_screen.dart';
 
 void main() {
-  // Гарантуємо, що системний рядок (годинник, батарея) буде прозорим/темним
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light, // Білі іконки (годинник)
-      systemNavigationBarColor: Color(0xFF0F0F0F), // Колір смужки знизу
-      systemNavigationBarIconBrightness: Brightness.light,
-    ),
-  );
-
-  runApp(const MyMillionDollarApp());
+  runApp(const MyApp());
 }
 
-class MyMillionDollarApp extends StatelessWidget {
-  const MyMillionDollarApp({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false, // Прибираємо стрічку "Debug"
-      title: 'Million Dollar Way',
-      theme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF0F0F0F),
-        primaryColor: const Color(0xFFD4AF37),
-        fontFamily: 'Roboto', // Або системний шрифт iOS
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF0F0F0F),
-          elevation: 0,
-          scrolledUnderElevation: 0,
+      title: 'Test',
+      theme: ThemeData.dark(),
+      home: const TestScreen(),
+    );
+  }
+}
+
+class TestScreen extends StatelessWidget {
+  const TestScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Test')),
+      body: const Center(
+        child: Text(
+          'Якщо бачиш це - Flutter працює!',
+          style: TextStyle(fontSize: 20),
         ),
       ),
-      // Одразу запускаємо наш головний екран
-      home: const MidasScreen(),
     );
   }
 }
