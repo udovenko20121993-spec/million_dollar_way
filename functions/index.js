@@ -199,7 +199,15 @@ async function syncReport(reportRef, userId, reportData) {
             lastSyncStatus: "success"
         });
 
-        // 6. Надсилаємо push-сповіщення
+        // 6. Перевіряємо нові дивіденди
+        const previousDividends = reportData.dividends || [];
+        const newDividends = findNewDividends(previousDividends, parsedData.dividends);
+        
+        if (newDividends.length > 0) {
+            await sendDividendNotification(userId, newDividends);
+        }
+
+        // 7. Надсилаємо push-сповіщення про синхронізацію
         await sendSyncNotification(userId, reportData.name, parsedData.lastBalance);
 
         console.log(`✅ Успіх! Баланс: ${parsedData.lastBalance}, Кеш: ${parsedData.cashBalance}`);
@@ -354,7 +362,115 @@ function parseIBKRStatement(statement) {
 }
 
 // ============================================================
-// 📱 PUSH NOTIFICATION
+// 💰 ПОШУК НОВИХ ДИВІДЕНДІВ
+// ============================================================
+function findNewDividends(previousDividends, currentDividends) {
+    if (!currentDividends || currentDividends.length === 0) {
+        return [];
+    }
+    
+    // Створюємо Set з унікальними ключами попередніх дивідендів
+    const previousKeys = new Set(
+        previousDividends.map(d => `${d.symbol}_${d.date}_${d.amount}`)
+    );
+    
+    // Знаходимо нові дивіденди
+    const newDividends = currentDividends.filter(d => {
+        const key = `${d.symbol}_${d.date}_${d.amount}`;
+        return !previousKeys.has(key);
+    });
+    
+    return newDividends;
+}
+
+// ============================================================
+// 💵 PUSH NOTIFICATION: ДИВІДЕНДИ
+// ============================================================
+async function sendDividendNotification(userId, newDividends) {
+    try {
+        const userDoc = await admin.firestore().doc(`users/${userId}`).get();
+        const userData = userDoc.data() || {};
+        const fcmToken = userData.fcmToken;
+
+        if (!fcmToken) {
+            console.log(`⚠️ Користувач ${userId} не має FCM токена для дивідендів`);
+            return;
+        }
+
+        // Рахуємо загальну суму нових дивідендів
+        const totalAmount = newDividends.reduce((sum, d) => sum + d.amount, 0);
+        
+        // Групуємо по символах
+        const symbols = [...new Set(newDividends.map(d => d.symbol))];
+        const symbolsText = symbols.length <= 3 
+            ? symbols.join(', ') 
+            : `${symbols.slice(0, 3).join(', ')} та ще ${symbols.length - 3}`;
+
+        let title, body;
+
+        if (newDividends.length === 1) {
+            const div = newDividends[0];
+            title = `💰 Дивіденд від ${div.symbol}!`;
+            body = `Ви отримали $${div.amount.toFixed(2)}`;
+        } else {
+            title = `💰 ${newDividends.length} нових дивідендів!`;
+            body = `${symbolsText}: загалом $${totalAmount.toFixed(2)}`;
+        }
+
+        const message = {
+            notification: {
+                title: title,
+                body: body
+            },
+            data: {
+                type: "dividend",
+                count: newDividends.length.toString(),
+                totalAmount: totalAmount.toString(),
+                symbols: symbols.join(',')
+            },
+            android: {
+                notification: {
+                    channelId: "dividends_channel",
+                    priority: "high",
+                    icon: "ic_money"
+                }
+            },
+            apns: {
+                payload: {
+                    aps: {
+                        badge: newDividends.length,
+                        sound: "default"
+                    }
+                }
+            },
+            token: fcmToken
+        };
+
+        await admin.messaging().send(message);
+        console.log(`💵 Dividend push надіслано: ${newDividends.length} дивідендів на $${totalAmount.toFixed(2)}`);
+
+        // Зберігаємо історію сповіщень
+        await admin.firestore()
+            .collection('users')
+            .doc(userId)
+            .collection('notifications')
+            .add({
+                type: 'dividend',
+                title: title,
+                body: body,
+                dividends: newDividends,
+                totalAmount: totalAmount,
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                read: false
+            });
+
+    } catch (error) {
+        console.error(`⚠️ Помилка надсилання dividend push: ${error.message}`);
+    }
+}
+
+// ============================================================
+// 📱 PUSH NOTIFICATION: СИНХРОНІЗАЦІЯ
 // ============================================================
 async function sendSyncNotification(userId, reportName, balance) {
     try {
