@@ -171,7 +171,7 @@ class FileService {
       }
 
       // В) Угоди (Trades) + КОМІСІЇ
-      final tradeParser = IBKRRarser();
+      final tradeParser = IBKRRarser(); // Note: Class name has typo but keeping for compatibility
       final nbuService = NbuExchangeRateService();
       final baseCurrency =
           flexStatement.getAttribute('baseCurrency') ??
