@@ -1,4 +1,4 @@
-import 'dart:ui' show Color;
+import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -90,7 +90,7 @@ class NotificationService {
         importance: Importance.high,
         enableVibration: true,
         playSound: true,
-        ledColor: Color.fromARGB(255, 0, 200, 83),
+        ledColor: Color(0xFF00C853),
         showBadge: true,
       ),
     );
@@ -156,7 +156,7 @@ class NotificationService {
           importance: Importance.high,
           priority: Priority.high,
           icon: '@mipmap/ic_launcher',
-          color: Color.fromARGB(255, 212, 175, 55), // Золотий
+          color: Color(0xFFD4AF37), // Золотий
           enableVibration: true,
           playSound: true,
           styleInformation: BigTextStyleInformation(''),
@@ -171,7 +171,7 @@ class NotificationService {
           importance: Importance.max,
           priority: Priority.max,
           icon: '@mipmap/ic_launcher',
-          color: Color.fromARGB(255, 255, 87, 34), // Червоний
+          color: Color(0xFFFF5722), // Червоний
           enableVibration: true,
           playSound: true,
         );
@@ -185,7 +185,7 @@ class NotificationService {
           importance: Importance.defaultImportance,
           priority: Priority.defaultPriority,
           icon: '@mipmap/ic_launcher',
-          color: Color.fromARGB(255, 0, 200, 83), // Зелений
+          color: Color(0xFF00C853), // Зелений
         );
     }
 
@@ -215,7 +215,7 @@ class NotificationService {
           'Дивіденди',
           importance: Importance.high,
           priority: Priority.high,
-          color: Color.fromARGB(255, 212, 175, 55),
+          color: Color(0xFFD4AF37),
         ),
       ),
       payload: 'dividend:$symbol:$amount',
@@ -237,7 +237,7 @@ class NotificationService {
           'Синхронізація',
           importance: Importance.defaultImportance,
           priority: Priority.defaultPriority,
-          color: Color.fromARGB(255, 0, 200, 83),
+          color: Color(0xFF00C853),
         ),
       ),
       payload: 'sync:$reportName',
@@ -259,7 +259,7 @@ class NotificationService {
           'Важливі сповіщення',
           importance: Importance.max,
           priority: Priority.max,
-          color: Color.fromARGB(255, 255, 87, 34),
+          color: Color(0xFFFF5722),
         ),
       ),
       payload: 'error',
