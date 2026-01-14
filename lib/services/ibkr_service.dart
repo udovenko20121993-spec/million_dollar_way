@@ -1,12 +1,14 @@
-<<<<<<< Current (Your changes)
 import 'dart:convert';
 import 'dart:developer' as developer;
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:xml/xml.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'cloud_firestore_service.dart';
 import '../domain/models/ibkr_data.dart';
+import '../models/sync_settings.dart';
+import '../models/ibkr_data.dart' as models;
 
 /// Production логування для IBKR API операцій
 class IbkrLogger {
@@ -44,10 +46,16 @@ class IbkrLogger {
   }
 }
 
+/// Сервіс для роботи з IBKR API та синхронізацією
 class IbkrService {
   // Базова URL для API IBKR
   static const String _baseUrl =
       "https://www.interactivebrokers.com/Universal/servlet/FlexStatementService";
+
+  // Ключі для кешування
+  static const String _cachedReportKey = 'ibkr_cached_report';
+  static const String _cacheTimestampKey = 'ibkr_cache_timestamp';
+  static const Duration _cacheExpiry = Duration(hours: 12); // Кеш діє 12 годин
 
   // Production логування
   static void _logInfo(String operation, String message) =>
@@ -59,19 +67,15 @@ class IbkrService {
     String message, {
     Object? error,
     StackTrace? stackTrace,
-  }) => IbkrLogger.logError(
-    operation,
-    message,
-    error: error,
-    stackTrace: stackTrace,
-  );
+  }) =>
+      IbkrLogger.logError(
+        operation,
+        message,
+        error: error,
+        stackTrace: stackTrace,
+      );
 
-  // Ключі для кешування
-  static const String _cachedReportKey = 'ibkr_cached_report';
-  static const String _cacheTimestampKey = 'ibkr_cache_timestamp';
-  static const Duration _cacheExpiry = Duration(hours: 12); // Кеш діє 12 годин
-
-  // --- МЕТОДИ ДЛЯ РОБОТИ З КЕШЕМ ---
+  // ============== СТАТИЧНІ МЕТОДИ ДЛЯ API ==============
 
   /// Зберегти звіт в локальний кеш
   static Future<void> _cacheReport(IBKRReport report) async {
@@ -129,7 +133,7 @@ class IbkrService {
     }
   }
 
-  // --- МЕТОД 1: ЗАВАНТАЖЕННЯ ЗВІТУ (2 кроки) ---
+  /// Завантажити Flex Query звіт (2 кроки)
   static Future<String> fetchFlexQuery(String token, String queryId) async {
     const operation = 'FETCH_FLEX_QUERY';
     try {
@@ -245,7 +249,7 @@ class IbkrService {
     }
   }
 
-  // --- МЕТОД 2: ПАРСИНГ (Той самий, що й був) ---
+  /// Парсинг великого XML файлу
   static Future<Map<String, dynamic>> parseLargeXml(String xmlBody) async {
     return await compute(_doHeavyParsing, xmlBody);
   }
@@ -342,7 +346,7 @@ class IbkrService {
     };
   }
 
-  // Отримання поточного портфеля для MidasAiService
+  /// Отримання поточного портфеля для MidasAiService
   static Future<Map<String, dynamic>?> getCurrentPortfolio({
     bool forceRefresh = false,
   }) async {
@@ -500,16 +504,11 @@ class IbkrService {
       uploadDate: uploadDate,
       flexQueryId: null,
     );
-=======
-import 'package:cloud_firestore/cloud_firestore.dart';
-import '../models/sync_settings.dart';
-import '../models/ibkr_data.dart';
+  }
 
-/// Сервіс для роботи з IBKR синхронізацією
-class IbkrService {
+  // ============== ЕКЗЕМПЛЯРНІ МЕТОДИ ДЛЯ FIRESTORE ==============
+
   final FirebaseFirestore _db = FirebaseFirestore.instance;
-
-  // ID користувача (в реальному додатку - з Firebase Auth)
   final String userId;
 
   IbkrService({required this.userId});
@@ -577,7 +576,7 @@ class IbkrService {
   // ============== ЗВІТИ ==============
 
   /// Отримати всі звіти користувача
-  Stream<List<IBKRReport>> getReportsStream() {
+  Stream<List<models.IBKRReport>> getReportsStream() {
     return _db
         .collection('users')
         .doc(userId)
@@ -585,11 +584,11 @@ class IbkrService {
         .orderBy('lastSyncTime', descending: true)
         .snapshots()
         .map((snapshot) =>
-            snapshot.docs.map((doc) => IBKRReport.fromFirestore(doc)).toList());
+            snapshot.docs.map((doc) => models.IBKRReport.fromFirestore(doc)).toList());
   }
 
   /// Отримати останній звіт
-  Future<IBKRReport?> getLatestReport() async {
+  Future<models.IBKRReport?> getLatestReport() async {
     final snapshot = await _db
         .collection('users')
         .doc(userId)
@@ -599,7 +598,7 @@ class IbkrService {
         .get();
 
     if (snapshot.docs.isEmpty) return null;
-    return IBKRReport.fromFirestore(snapshot.docs.first);
+    return models.IBKRReport.fromFirestore(snapshot.docs.first);
   }
 
   // ============== СИНХРОНІЗАЦІЯ ==============
@@ -657,7 +656,7 @@ class IbkrService {
         .delete();
   }
 
-  // ============== ДОПОМІЖНІ МЕТОДИ ==============
+  // ============== ДОПОМІЖНІ СТАТИЧНІ МЕТОДИ ==============
 
   /// Перевірити чи сьогодні робочий день (NYSE)
   static bool isMarketDay() {
@@ -700,6 +699,5 @@ class IbkrService {
     if (diff.inDays < 7) return '${diff.inDays} дн тому';
 
     return '${time.day}.${time.month}.${time.year}';
->>>>>>> Incoming (Background Agent changes)
   }
 }

@@ -2,21 +2,8 @@ include: package:flutter_lints/flutter.yaml
 
 linter:
   rules:
-<<<<<<< Current (Your changes)
-    # avoid_print: false  # Uncomment to disable the `avoid_print` rule
+    avoid_print: false
     # prefer_single_quotes: true  # Uncomment to enable the `prefer_single_quotes` rule
 
 # Additional information about this file can be found at
 # https://dart.dev/guides/language/analysis-options
-# Це існуючий вміст вашого файлу
-linter:
-  rules:
-    # Ваші існуючі правила...
-
-# Додайте цей блок в кінець файлу
-dcm:
-  rules:
-    - no-unused-files
-=======
-    avoid_print: false
->>>>>>> Incoming (Background Agent changes)
