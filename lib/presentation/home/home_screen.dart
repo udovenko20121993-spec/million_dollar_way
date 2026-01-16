@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:million_dollar_way/models/ibkr_data.dart';
 import 'package:million_dollar_way/presentation/dashboard/widgets/capital_chart.dart';
+import 'package:million_dollar_way/presentation/home/widgets/sp500_comparison_card.dart';
 
 class HomeScreen extends StatelessWidget {
   final String userId = "user_test_1";
@@ -73,6 +74,10 @@ class HomeScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // 0. ПОРІВНЯННЯ З S&P 500 (ЗВЕРХУ)
+                Sp500ComparisonCard(report: report),
+
+                const SizedBox(height: 8),
                 // 1. ГОЛОВНА КАРТКА (Баланс + Прибуток)
                 _buildMainCard(report.lastBalance, profit, profitPercent),
 
